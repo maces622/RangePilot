@@ -34,3 +34,90 @@ F:\GTO-Agent\                         # 总仓库 / superproject
 │  └─ gto-gui/                        # Git submodule：开源 GUI Solver
 └─ engines/
    └─ dsh/                            # Git submodule：DSH Agent Engine
+```
+
+## 3. GTO 本地 API（阶段 4）
+
+阶段 4 已实现本地状态读取、牌局配置、异步求解控制和结果查询接口，默认关闭，必须通过启动参数显式开启：
+
+```text
+TexasSolverGui --api-enabled --api-port 0 [--api-discovery-file <path>]
+```
+
+约束：
+
+- 只监听 `127.0.0.1`，端点为 `ws://127.0.0.1:<port>/rpc`；
+- 每次启动生成随机 token，并写入发现文件；
+- 默认发现文件为 `%LOCALAPPDATA%\RangePilot\gto-gui\api.json`；
+- 客户端必须先调用 `system.hello`，之后才能调用其他方法；
+- 阶段 4 启用 `state.read`、`spot.write`、`solve.control`、`result.read` 和 `artifact.read` capability；
+- `spot.set` 和 `solve.start` 必须携带 `expectedRevision`，冲突返回 `STATE_CONFLICT`，不做隐式 merge；
+- 同一时间只允许一个求解任务，求解通过 `jobId` 异步跟踪；
+- `solve.cancel` 进入 `cancelling`，底层线程停止后变为 `cancelled`；
+- 节点策略/EV 响应只返回动作级摘要，完整矩阵写入 artifact；
+- 节点 ID 使用树路径格式，例如 `root`、`root/a0`、`root/a0/cAh/a1`；
+- API 不包含 DSH、Agent、Prompt、Chat 或 LLM 概念。
+
+已实现方法：
+
+- `system.hello`
+- `system.getCapabilities`
+- `system.health`
+- `state.get`
+- `spot.validate`
+- `range.validate`
+- `spot.set`
+- `solve.start`
+- `solve.getStatus`
+- `solve.cancel`
+- `solve.getSummary`
+- `result.getNodeStrategy`
+- `result.getActionEv`
+- `result.getExploitability`
+- `artifact.getMetadata`
+- `event.state_changed`
+- `event.solve_queued`
+- `event.solve_progress`
+- `event.solve_completed`
+- `event.solve_failed`
+- `event.solve_cancelled`
+
+关键目录：
+
+```text
+apps/gto-gui/
+├─ api/schema/                 # JSON Schema 契约
+├─ src/api/                    # WebSocket Server、JSON-RPC、DTO、服务和事件总线
+└─ tests/api/                  # JSON Schema 契约测试和 WebSocket 集成 smoke test
+```
+
+`MainWindow` 把当前 GUI 状态同步给 `GtoApplicationService`，并在 API 成功写入牌局后接收规范化 Spot 回写 UI；API Server 只依赖应用服务，不直接读取 Qt 控件。`GuiSolverJobRunner` 把现有 `QSolverJob` 适配为 JobManager 的求解后端，`GuiStrategyResultProvider` 将 GameTree/Trainable 结果转换为稳定 DTO，`ArtifactStore` 负责完整矩阵文件、哈希和元数据。
+
+## 4. 构建与测试
+
+Qt 工程需要 `network` 和 `websockets` 模块：
+
+```bash
+cd apps/gto-gui
+qmake TexasSolverGui.pro
+make
+```
+
+契约测试：
+
+```bash
+python tests/api/test_contracts.py
+```
+
+本地 API WebSocket 集成测试（不需要 GUI）：
+
+```bash
+mkdir build-api-test
+cd build-api-test
+qmake ../tests/api/api_smoke_test.pro
+make
+./api_smoke_test
+```
+
+修改协议时，顺序必须是：先更新 `api/schema/`，再更新 C++ DTO / dispatcher，
+最后更新客户端和测试。
