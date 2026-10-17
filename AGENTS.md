@@ -56,6 +56,7 @@ TexasSolverGui --api-enabled --api-port 0 [--api-discovery-file <path>]
 - `spot.set` 和 `solve.start` 必须携带 `expectedRevision`，冲突返回 `STATE_CONFLICT`，不做隐式 merge；
 - 同一时间只允许一个求解任务，求解通过 `jobId` 异步跟踪；
 - `solve.cancel` 进入 `cancelling`，底层线程停止后变为 `cancelled`；
+- `solve.start` 会先按当前 SpotSpec 构建或重建 GameTree，再开始训练；
 - 节点策略/EV 响应只返回动作级摘要，完整矩阵写入 artifact；
 - 节点 ID 使用树路径格式，例如 `root`、`root/a0`、`root/a0/cAh/a1`；
 - API 不包含 DSH、Agent、Prompt、Chat 或 LLM 概念。

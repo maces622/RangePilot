@@ -82,19 +82,26 @@ prompt 完成，以及 ChatPanel 输入/发送/流式渲染路径。
   - 客户端拒绝审批后，工具返回 rejected，未启动 GTO 求解。
 - 真实 GUI 仍成功构建；临时 mock profile 和 mock LLM 文件已在验证后清理，
   `engines/dsh` 工作区保持干净。
+- 使用真实 DeepSeek 模型完成端到端验收：
+  - Agent 调用 `gto_get_state`，返回真实 revision、positions、board；
+  - 故意使用 stale `expectedRevision` 调用 `gto_set_spot`，返回
+    `STATE_CONFLICT`，未修改状态；
+  - `gto_start_solve` 触发真实 `session/request_permission`，拒绝后未启动求解；
+  - 允许审批后后台 solve job 启动，进度从 queued 到 running 到 completed；
+  - 3 次迭代的受控求解完成后，`gto_query_strategy` 返回 root 节点动作摘要；
+  - 通过 `job_kill` 终止 DSH 后台任务后，GTO 后端从 `cancelling` 进入
+    `cancelled`。
 
-## 尚未完成
+## 剩余事项
 
-1. 当前环境没有真实 `DEEPSEEK_API_KEY`，因此尚未用真实模型跑完整工具对话。
-2. 尚未完成真实模型凭据下的完整 MVP 验收：
-   - revision 冲突；
-   - 允许审批后后台求解；
-   - 求解进度与完成；
-   - 用户停止同时取消 DSH job 与 GTO solve；
-   - 求解完成后的 strategy 查询。
-3. 插件当前直接以 TypeScript source 作为 `main`；本次 `link:` 安装已验证可
+1. 插件当前直接以 TypeScript source 作为 `main`；本次 `link:` 安装已验证可
    加载，但发布/分发前仍应补充正式构建产物或确认目标 DSH profile 的
    source-loading 策略。
+2. 需要把真实模型验收整理成可重复的本地验收脚本或受控 snapshot。
+3. 需要确认正式发布时 `DEEPSEEK_API_KEY` 只通过环境变量、credentials service
+   或用户级不入库配置提供；仓库根 `.gitignore` 已忽略 `.env` 和 `.env.*`。
+4. 当前 DSH 以源码方式启动时仍有 typert 未构建警告，不影响本次链路，但正式
+   发布前应执行 DSH artifacts build。
 
 ## 下一步
 
