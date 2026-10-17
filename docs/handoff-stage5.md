@@ -5,6 +5,12 @@
 >
 > 当前工作目录：`F:\GTO-Agent`
 >
+> 实施状态：阶段 5A（`ui.focus`、`ui.focusNode`、`ui.openResult`、
+> `event.selection_changed`、StrategyExplorer 节点定位）与阶段 5B
+> （`plugins/dsh-gto-solver`）已在当前工作区实现。接口契约测试、API smoke
+> test、插件协议/策略/任务测试均通过；完整 GUI 链接仍受本文第 9.3 节记录的
+> 上游 MSVC 兼容问题影响。工作区尚未提交。
+>
 > 本文件是 2026-10-17 阶段 4 完成后的交接快照。工作区仍为未提交状态，严禁直接
 > `git checkout`、`git reset --hard` 或清理 `apps/gto-gui` 中的未提交改动。
 

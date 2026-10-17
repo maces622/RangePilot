@@ -19,9 +19,9 @@ RangePilot 是一个早期项目，目标是把开源 GTO Solver 的原始界面
 
 当前重点是先把 GTO Solver 的能力以稳定、可测试的方式暴露出来，再逐步接入 Chat 和 Agent 工作流。
 
-## 本地 API（阶段 4）
+## 本地 API（阶段 5）
 
-阶段 4 提供默认关闭的本地 API，使用 WebSocket + JSON-RPC 2.0：
+阶段 5 提供默认关闭的本地 API，使用 WebSocket + JSON-RPC 2.0：
 
 ```bash
 TexasSolverGui --api-enabled --api-port 0
@@ -30,7 +30,7 @@ TexasSolverGui --api-enabled --api-port 0
 启动后服务只在 `127.0.0.1` 监听，并将会话发现信息写入
 `%LOCALAPPDATA%\RangePilot\gto-gui\api.json`。客户端读取端口和 token 后连接
 `ws://127.0.0.1:<port>/rpc`，先调用 `system.hello`，再调用 `state.get`。
-可用 capability 为 `state.read`、`spot.write`、`solve.control`、`result.read` 和 `artifact.read`。阶段 4 支持牌局校验/写入、异步求解控制，以及节点策略、动作 EV、exploitability 和 artifact 元数据查询。写操作必须携带 `expectedRevision`，版本冲突返回 `STATE_CONFLICT`；完整策略矩阵通过 artifact 引用返回，不进入 JSON-RPC 响应正文。
+可用 capability 为 `state.read`、`spot.write`、`solve.control`、`result.read`、`artifact.read` 和 `ui.focus`。阶段 5 支持牌局校验/写入、异步求解控制、节点策略/EV/exploitability/artifact 查询，以及 GUI 结果面板打开、节点聚焦和 `event.selection_changed`。写操作必须携带 `expectedRevision`，版本冲突返回 `STATE_CONFLICT`；完整策略矩阵通过 artifact 引用返回，不进入 JSON-RPC 响应正文。
 
 接口契约位于 `apps/gto-gui/api/schema/`，测试位于 `apps/gto-gui/tests/api/`。
 
@@ -62,6 +62,7 @@ flowchart LR
 |---|---|
 | `apps/gto-gui` | 开源 GTO Solver GUI 的 Git submodule |`n| `apps/gto-gui/api/schema` | 本地 GTO API 的 JSON Schema 契约 |`n| `apps/gto-gui/src/api` | WebSocket Server、JSON-RPC、应用服务和事件 DTO |`n| `apps/gto-gui/tests/api` | API 契约测试与 WebSocket smoke test |
 | `engines/dsh` | DSH Agent Engine 的 Git submodule |
+| `plugins/dsh-gto-solver` | 树外 DSH Cordis 插件：GTO 工具、后台求解和审批 |
 | `docs/gto-interface-exposure.md` | Solver 接口暴露技术方案 |
 | `docs/` | 架构、设计和集成文档 |
 

@@ -32,13 +32,15 @@ F:\GTO-Agent\                         # 总仓库 / superproject
 ├─ .gitmodules                        # submodule 配置
 ├─ apps/
 │  └─ gto-gui/                        # Git submodule：开源 GUI Solver
-└─ engines/
-   └─ dsh/                            # Git submodule：DSH Agent Engine
+├─ engines/
+│  └─ dsh/                            # Git submodule：DSH Agent Engine
+└─ plugins/
+   └─ dsh-gto-solver/                 # 树外 DSH Cordis 插件，不属于 engines/dsh 核心
 ```
 
-## 3. GTO 本地 API（阶段 4）
+## 3. GTO 本地 API（阶段 5）
 
-阶段 4 已实现本地状态读取、牌局配置、异步求解控制和结果查询接口，默认关闭，必须通过启动参数显式开启：
+阶段 5 在本地状态读取、牌局配置、异步求解控制和结果查询之上增加了 GUI 节点聚焦与 DSH 插件边界。API 默认关闭，必须通过启动参数显式开启：
 
 ```text
 TexasSolverGui --api-enabled --api-port 0 [--api-discovery-file <path>]
@@ -50,7 +52,7 @@ TexasSolverGui --api-enabled --api-port 0 [--api-discovery-file <path>]
 - 每次启动生成随机 token，并写入发现文件；
 - 默认发现文件为 `%LOCALAPPDATA%\RangePilot\gto-gui\api.json`；
 - 客户端必须先调用 `system.hello`，之后才能调用其他方法；
-- 阶段 4 启用 `state.read`、`spot.write`、`solve.control`、`result.read` 和 `artifact.read` capability；
+- 阶段 5 启用 `state.read`、`spot.write`、`solve.control`、`result.read`、`artifact.read` 和 `ui.focus` capability；
 - `spot.set` 和 `solve.start` 必须携带 `expectedRevision`，冲突返回 `STATE_CONFLICT`，不做隐式 merge；
 - 同一时间只允许一个求解任务，求解通过 `jobId` 异步跟踪；
 - `solve.cancel` 进入 `cancelling`，底层线程停止后变为 `cancelled`；
@@ -75,7 +77,10 @@ TexasSolverGui --api-enabled --api-port 0 [--api-discovery-file <path>]
 - `result.getActionEv`
 - `result.getExploitability`
 - `artifact.getMetadata`
+- `ui.focusNode`
+- `ui.openResult`
 - `event.state_changed`
+- `event.selection_changed`
 - `event.solve_queued`
 - `event.solve_progress`
 - `event.solve_completed`
@@ -89,6 +94,8 @@ apps/gto-gui/
 ├─ api/schema/                 # JSON Schema 契约
 ├─ src/api/                    # WebSocket Server、JSON-RPC、DTO、服务和事件总线
 └─ tests/api/                  # JSON Schema 契约测试和 WebSocket 集成 smoke test
+
+plugins/dsh-gto-solver/        # GTO DSH 工具、API client、后台求解与审批
 ```
 
 `MainWindow` 把当前 GUI 状态同步给 `GtoApplicationService`，并在 API 成功写入牌局后接收规范化 Spot 回写 UI；API Server 只依赖应用服务，不直接读取 Qt 控件。`GuiSolverJobRunner` 把现有 `QSolverJob` 适配为 JobManager 的求解后端，`GuiStrategyResultProvider` 将 GameTree/Trainable 结果转换为稳定 DTO，`ArtifactStore` 负责完整矩阵文件、哈希和元数据。
