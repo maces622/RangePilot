@@ -70,31 +70,39 @@ prompt 完成，以及 ChatPanel 输入/发送/流式渲染路径。
 - GTO API contract tests 通过；
 - GTO API WebSocket smoke test 通过；
 - DSH 插件独立测试 10/10 通过；
-- GUI 以 offscreen 模式启动并成功拉起 fake ACP 子进程。
+- GUI 以 offscreen 模式启动并成功拉起 fake ACP 子进程；
+- `engines/dsh` 依赖已安装，真实 `dsh --profile acp` 能完成 `initialize`
+  和 `session/new`；
+- `plugins/dsh-gto-solver` 已通过 `dsh plugin --profile acp add link:...`
+  安装，并在真实 Cordis profile 中加载；
+- 使用临时 keyless mock LLM 完成真实 ACP 端到端验证：
+  - Agent 调用真实 `gto_get_state`，从运行中的 GUI API 读取 revision 和 spot；
+  - Agent 调用 `gto_start_solve` 时，DSH 发出
+    `session/request_permission`；
+  - 客户端拒绝审批后，工具返回 rejected，未启动 GTO 求解。
+- 真实 GUI 仍成功构建；临时 mock profile 和 mock LLM 文件已在验证后清理，
+  `engines/dsh` 工作区保持干净。
 
 ## 尚未完成
 
-1. 当前环境无法完成 `engines/dsh` 的完整依赖安装（离线 store 缺少部分包，
-   网络不可用），因此还没有启动真实 DSH `acp` profile。
-2. 尚未通过 `dsh plugin --profile acp add ...` 安装树外插件并验证真实
-   `ctx.tools` / `ctx.jobs` / approval 链路。
-3. 还缺真实模型凭据下的端到端验收：
-   - Agent 读状态；
+1. 当前环境没有真实 `DEEPSEEK_API_KEY`，因此尚未用真实模型跑完整工具对话。
+2. 尚未完成真实模型凭据下的完整 MVP 验收：
    - revision 冲突；
-   - 一次审批；
-   - 后台求解进度；
+   - 允许审批后后台求解；
+   - 求解进度与完成；
    - 用户停止同时取消 DSH job 与 GTO solve；
-   - strategy 查询。
-4. 插件当前直接以 TypeScript source 作为 `main`；正式安装前需要确认目标
-   DSH profile 的 source/link 加载方式或补充构建产物。
+   - 求解完成后的 strategy 查询。
+3. 插件当前直接以 TypeScript source 作为 `main`；本次 `link:` 安装已验证可
+   加载，但发布/分发前仍应补充正式构建产物或确认目标 DSH profile 的
+   source-loading 策略。
 
 ## 下一步
 
-在具备 DSH 依赖和模型凭据的机器上：
+当前剩余工作已经收敛为真实模型下的完整验收：
 
-1. 构建 DSH 并创建一次性 `acp` profile；
-2. 安装 `plugins/dsh-gto-solver`；
-3. 启动 GUI，设置 `RANGEPILOT_DSH_*`；
-4. 按 `docs/dsh-side-mvp.md` 第 13 节逐项跑验收；
-5. 根据真实 ACP/tool 结果修正协议或插件适配；
-6. 再提交阶段 6。
+1. 配置 `DEEPSEEK_API_KEY`；
+2. 启动 GUI 与真实 `dsh --profile acp`；
+3. 按 `docs/dsh-side-mvp.md` 第 13 节逐项跑验收；
+4. 重点补齐 allow 审批、revision 冲突、求解进度、停止取消和 strategy 查询；
+5. 根据真实模型对话修正插件工具描述或审批文案；
+6. 验收通过后更新阶段状态和 README。
