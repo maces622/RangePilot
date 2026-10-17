@@ -92,6 +92,22 @@ prompt 完成，以及 ChatPanel 输入/发送/流式渲染路径。
   - 通过 `job_kill` 终止 DSH 后台任务后，GTO 后端从 `cancelling` 进入
     `cancelled`。
 
+## 直接演示
+
+已增加：
+
+- `scripts/build-mvp-demo.ps1`
+- `scripts/run-mvp-demo.ps1`
+- `scripts/run-mvp-demo.cmd`
+- `.env.example`
+
+演示启动器会构建 GUI、创建被忽略的 `.demo/dsh-home`、安装树外插件、
+拉起带 Local API 的 GUI，并启动独立浮动的 `AI Chat` 窗口。真实 Key 只从
+ignored `.env` 或调用进程环境读取。
+
+真实 ChatPanel 已用真实 DSH + 真实模型做 smoke test：发送 `gto_get_state`
+请求并收到包含 revision 的真实回答。
+
 ## 剩余事项
 
 1. 插件当前直接以 TypeScript source 作为 `main`；本次 `link:` 安装已验证可

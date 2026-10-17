@@ -19,6 +19,37 @@ RangePilot 是一个早期项目，目标是把开源 GTO Solver 的原始界面
 
 当前重点是先把 GTO Solver 的能力以稳定、可测试的方式暴露出来，再逐步接入 Chat 和 Agent 工作流。
 
+## 直接演示 MVP
+
+1. 复制 `.env.example` 为 `.env`，填入本地 `DEEPSEEK_API_KEY`。`.env` 已被 `.gitignore` 忽略。
+2. 构建演示程序：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-mvp-demo.ps1
+```
+
+3. 启动演示：
+
+```powershell
+scripts\run-mvp-demo.cmd
+```
+
+启动器会：
+
+- 拉起带本地 API 的 TexasSolver GUI；
+- 创建 `.demo/dsh-home` 临时 DSH 环境；
+- 把 `plugins/dsh-gto-solver` 安装到 `acp` profile；
+- 启动 DSH ACP，并由右侧独立 `AI Chat` 窗口连接。
+
+可以直接尝试：
+
+- `读取当前 GTO 状态，告诉我 revision、positions 和 board。`
+- `读取状态后，用过期 revision 调用 gto_set_spot，验证 STATE_CONFLICT。`
+- `启动一个 maxIterations=3、targetExploitability=10 的求解，审批时等我确认。`
+- `求解完成后查询 root 节点的策略摘要。`
+
+演示环境、构建产物和密钥文件都不会进入 Git。
+
 ## 本地 API 与 AI Chat（阶段 6）
 
 GTO 本地 API 默认关闭，使用 WebSocket + JSON-RPC 2.0：
