@@ -380,7 +380,21 @@ Qt 需要处理的 ACP 消息：
 - 禁止绕过 `tools/pre-execute` 启动求解；
 - 禁止在审批拒绝后继续调用 GTO 求解接口。
 
-## 15. MVP 完成后的下一步
+## 15. 本地开发启动配置
+
+Qt Chat 通过 `QProcess` 启动 DSH ACP profile，可用以下环境变量覆盖启动命令：
+
+```text
+RANGEPILOT_DSH_COMMAND        # 例如 dsh，或 node
+RANGEPILOT_DSH_ARGS           # 例如 "--profile acp"
+RANGEPILOT_DSH_CWD            # DSH 工作目录
+```
+
+也可以写入 `QSettings` 的 `dsh/command`、`dsh/arguments`、`dsh/workingDirectory`。
+树外插件安装到 `acp` profile 后，Chat 中的 `gto_start_solve` 审批会映射为
+`session/request_permission`，由 Qt 显示允许/拒绝对话框。
+
+## 16. MVP 完成后的下一步
 
 本 MVP 完成后再讨论：
 

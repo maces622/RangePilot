@@ -19,9 +19,9 @@ RangePilot 是一个早期项目，目标是把开源 GTO Solver 的原始界面
 
 当前重点是先把 GTO Solver 的能力以稳定、可测试的方式暴露出来，再逐步接入 Chat 和 Agent 工作流。
 
-## 本地 API（阶段 5）
+## 本地 API 与 AI Chat（阶段 6）
 
-阶段 5 提供默认关闭的本地 API，使用 WebSocket + JSON-RPC 2.0：
+GTO 本地 API 默认关闭，使用 WebSocket + JSON-RPC 2.0：
 
 ```bash
 TexasSolverGui --api-enabled --api-port 0
@@ -33,6 +33,18 @@ TexasSolverGui --api-enabled --api-port 0
 可用 capability 为 `state.read`、`spot.write`、`solve.control`、`result.read`、`artifact.read` 和 `ui.focus`。阶段 5 支持牌局校验/写入、异步求解控制、节点策略/EV/exploitability/artifact 查询，以及 GUI 结果面板打开、节点聚焦和 `event.selection_changed`。写操作必须携带 `expectedRevision`，版本冲突返回 `STATE_CONFLICT`；完整策略矩阵通过 artifact 引用返回，不进入 JSON-RPC 响应正文。
 
 接口契约位于 `apps/gto-gui/api/schema/`，测试位于 `apps/gto-gui/tests/api/`。
+
+阶段 6 增加了最小 Qt AI Chat 面板与 ACP v1 stdio 客户端。GUI 通过 `QProcess` 启动 `dsh --profile acp`，处理 `initialize`、`session/new`、`session/prompt`、`session/update`、`session/request_permission`、`session/cancel` 和 `session/close`。求解审批会显示为模态允许/拒绝对话框。
+
+开发环境可通过以下变量指定 DSH 启动方式：
+
+```text
+RANGEPILOT_DSH_COMMAND        # 例如 dsh，或 node
+RANGEPILOT_DSH_ARGS           # 例如 "--profile acp"，或 "--import tsx/esm apps/cli/src/bin.ts --profile acp"
+RANGEPILOT_DSH_CWD            # DSH 工作目录
+```
+
+`plugins/dsh-gto-solver` 需要通过 DSH profile 安装后才能被 `acp` profile 加载。
 
 ## 架构愿景
 
@@ -63,6 +75,7 @@ flowchart LR
 | `apps/gto-gui` | 开源 GTO Solver GUI 的 Git submodule |`n| `apps/gto-gui/api/schema` | 本地 GTO API 的 JSON Schema 契约 |`n| `apps/gto-gui/src/api` | WebSocket Server、JSON-RPC、应用服务和事件 DTO |`n| `apps/gto-gui/tests/api` | API 契约测试与 WebSocket smoke test |
 | `engines/dsh` | DSH Agent Engine 的 Git submodule |
 | `plugins/dsh-gto-solver` | 树外 DSH Cordis 插件：GTO 工具、后台求解和审批 |
+| `apps/gto-gui/src/chat` | Qt AI Chat 面板与 ACP stdio 客户端 |
 | `docs/gto-interface-exposure.md` | Solver 接口暴露技术方案 |
 | `docs/` | 架构、设计和集成文档 |
 

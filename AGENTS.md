@@ -38,9 +38,9 @@ F:\GTO-Agent\                         # 总仓库 / superproject
    └─ dsh-gto-solver/                 # 树外 DSH Cordis 插件，不属于 engines/dsh 核心
 ```
 
-## 3. GTO 本地 API（阶段 5）
+## 3. GTO 本地 API 与 Qt Chat（阶段 6）
 
-阶段 5 在本地状态读取、牌局配置、异步求解控制和结果查询之上增加了 GUI 节点聚焦与 DSH 插件边界。API 默认关闭，必须通过启动参数显式开启：
+阶段 6 在本地状态读取、牌局配置、异步求解控制、结果查询和 GUI 聚焦之上增加了最小 Qt AI Chat 面板与 ACP v1 stdio 客户端。API 默认关闭，必须通过启动参数显式开启：
 
 ```text
 TexasSolverGui --api-enabled --api-port 0 [--api-discovery-file <path>]
