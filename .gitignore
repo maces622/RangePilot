@@ -1,3 +1,9 @@
 
 # Local ebooks / large PDF resources
 /resource/ebook/*.pdf
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+*.local
