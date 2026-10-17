@@ -205,6 +205,8 @@ flowchart LR
 - 比 gRPC 更容易在现有 Qt 工程中落地；
 - 比命名管道更容易调试和跨语言接入。
 
+明确边界：本文定义的是 GTO GUI 自己的本地应用接口，**不是 MCP 接口**。MCP 只在后续需要把 GTO 能力开放给多个 Agent 或外部客户端时增加，不属于 MVP。
+
 ### 7.2 监听范围
 
 API Server 只监听 `127.0.0.1`，禁止监听 `0.0.0.0` 或公网地址。
@@ -703,32 +705,80 @@ stateDiagram-v2
 
 ## 11. DSH 接入方式
 
-DSH 不直接读取 Qt 控件，也不直接调用 C++ 对象。它通过插件调用本地 API。
+### 11.1 采用原生 DSH 插件，不采用 MCP
+
+MVP 的 DSH 接入形式确定为原生 Cordis 插件：
+
+- 插件注册 `ctx.tools`；
+- 求解通过 `ctx.jobs` 以后台任务运行；
+- 求解前通过 `tools/pre-execute` 和 `ctx.approval` 审批；
+- 插件内部使用 GTO API Client 调用本文定义的本地 JSON-RPC API。
+
+不使用 MCP 作为 MVP 主接口。MCP 适合把 GTO 能力开放给多个 Agent 或外部客户端，但当前 DSH 原生插件可以直接使用工具注册、后台任务、审批和会话上下文，少一层协议适配。
 
 ```mermaid
 flowchart LR
-    DSH["DSH Runtime"] --> PLUGIN["GTO Copilot Plugin"]
-    PLUGIN --> CLIENT["GTO API Client"]
-    CLIENT --> API["Local API"]
-    API --> SERVICE["GtoApplicationService"]
-    SERVICE --> SOLVER["PokerSolver / QSolverJob"]
-    PLUGIN --> PACKS["领域资源包"]
+    QT["自定义 Qt Chat"]
+    DSH["DSH ACP Runtime"]
+    PLUGIN["原生 GTO DSH 插件"]
+    CLIENT["GTO API Client"]
+    API["Local API<br/>WebSocket JSON-RPC"]
+    SERVICE["GtoApplicationService"]
+    SOLVER["PokerSolver / QSolverJob"]
+
+    QT -->|"ACP"| DSH
+    DSH -->|"ctx.tools / ctx.jobs"| PLUGIN
+    PLUGIN --> CLIENT
+    CLIENT --> API
+    API --> SERVICE
+    SERVICE --> SOLVER
 ```
 
-第一批 DSH 工具建议：
+Qt Chat 与 DSH 之间使用 ACP，DSH 插件与 GTO GUI 之间使用本文定义的 WebSocket JSON-RPC。两条链路不要混为同一个协议。
+
+### 11.2 插件边界
+
+| 部分 | 是否 DSH 插件 | 说明 |
+|---|---|---|
+| `apps/gto-gui` 的 Local API Server | 否 | GTO GUI 的应用内接口 |
+| `GtoApplicationService` | 否 | Solver 内部统一状态和命令服务 |
+| `plugins/dsh-gto-solver` | 是 | DSH 原生 Cordis 插件 |
+| 自定义 Qt Chat | 否 | DSH ACP 客户端 |
+| MCP Server | 否 | MVP 不实现，后续可选 |
+
+DSH 插件负责：
+
+- 注册 GTO 工具；
+- 调用 GTO local API；
+- 管理 `ctx.jobs` 后台求解任务；
+- 执行 `tools/pre-execute` 成本门禁；
+- 调用 `ctx.approval` 请求用户确认；
+- 把 Solver 结果整理成模型可见摘要。
+
+DSH 插件不负责：
+
+- 绘制或修改 Qt GUI；
+- 直接调用 `PokerSolver` 或 `QSolverJob`；
+- 直接操作 GUI 控件；
+- 管理模型凭据；
+- 定义 Qt 与 DSH 之间的 Chat 协议。
+
+### 11.3 MVP 工具清单
+
+工具名使用 DSH 常见的 snake_case；底层 API 方法仍使用点号命名空间。
 
 | DSH 工具 | 底层 API | 说明 |
 |---|---|---|
-| `gto.get_state` | `state.get` | 读取当前牌局和任务状态 |
-| `gto.validate_spot` | `spot.validate` | 校验用户输入 |
-| `gto.set_spot` | `spot.set` | 写入牌局配置 |
-| `gto.start_solve` | `solve.start` | 启动求解 |
-| `gto.get_solve_status` | `solve.getStatus` | 查询进度 |
-| `gto.cancel_solve` | `solve.cancel` | 取消求解 |
-| `gto.query_strategy` | `result.getNodeStrategy` | 查询节点策略 |
-| `gto.focus_node` | `ui.focusNode` | 同步 GUI 展示 |
+| `gto_get_state` | `state.get` | 读取当前牌局、revision 和任务状态 |
+| `gto_set_spot` | `spot.set` | 写入牌局配置 |
+| `gto_start_solve` | `solve.start` | 经审批后启动后台求解 |
+| `gto_get_solve_status` | `solve.getStatus` | 查询进度和收敛状态 |
+| `gto_query_strategy` | `result.getNodeStrategy` | 查询节点策略和 EV 摘要 |
 
-领域资源包仍然独立于 Solver API：`skills/` 放分析流程，`knowledge/` 放理论和训练资料，`tools/` 放确定性计算工具，`ui/` 放快捷操作，`eval/` 放评估用例。资源包不能覆盖 Solver 的安全限制和成本预算。
+`gto_start_solve` 必须经过 `tools/pre-execute` 和 `ctx.approval`。取消由 DSH 后台任务控制路径触发，生产方在取消时调用 GTO API 的取消接口。
+
+完整 MVP 设计见 [DSH 侧最小 MVP 设计](dsh-side-mvp.md)。
+
 ## 12. C++ 实现方案
 
 ### 12.1 新增文件
@@ -952,7 +1002,7 @@ QT_QPA_PLATFORM=offscreen
 3. 是否允许修改 `QSolverJob` 的线程模型；
 4. GUI 是否必须保持完全一致的布局，还是可以增加内部状态适配层；
 5. 第一阶段是否只做只读 API；
-6. DSH 侧希望直接连接 WebSocket，还是通过一个 Python/Node 适配进程；
+6. DSH 接入已确定：使用原生 DSH 插件直接连接本地 WebSocket API，不引入 MCP；
 7. artifact 第一版是否允许使用本地文件路径，还是必须通过本地 HTTP 服务；
 8. 是否需要支持多个 Solver 实例；
 9. 是否需要将 headless API 和 GUI API 合并为同一协议；
@@ -970,3 +1020,5 @@ QT_QPA_PLATFORM=offscreen
 6. 最后由 DSH 插件把这些能力映射成 Agent 工具。
 
 这样可以在产品形态尚未确定时，先建立一个稳定、可测试、可演进的 Solver 能力边界。后续无论 Chat 放在哪一侧、DSH 如何编排工具、领域资源包如何替换，都不需要反复改造 Solver 内部。
+
+接口形式确定为本地 WebSocket + JSON-RPC 2.0，不使用 MCP。DSH 侧通过原生 Cordis 插件消费这些能力，Qt Chat 与 DSH 之间使用 ACP。
