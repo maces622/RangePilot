@@ -1,0 +1,8 @@
+[submodule "apps/gto-gui"]
+	path = apps/gto-gui
+	url = https://github.com/maces622/Solver-for-Agent.git
+	branch = master
+[submodule "engines/dsh"]
+	path = engines/dsh
+	url = https://github.com/maces622/deepseek-harness-for-poker
+	branch = master
