@@ -1,141 +1,268 @@
-# RangePilot
+﻿# RangePilot
 
-RangePilot 是一个早期项目，目标是把开源 GTO Solver 的原始界面、Chat Agent 和 AI 分析能力整合成一个德州扑克研究工作台。
+RangePilot 是一个面向德州扑克 GTO 研究的 AI Agent 工作台。它保留原始开源
+GTO Solver 的 Qt GUI 和操作方式，通过本地 WebSocket API 与 DSH 插件把求解器
+能力安全地交给 Agent，并用 Chat 完成牌局配置、求解控制、结果解读和 GUI 定位。
 
-我们不想重写 Solver，也不想让用户离开熟悉的操作界面。RangePilot 希望在保留原始 GUI 使用习惯的基础上，让 Agent 能够理解当前牌局、代替用户完成部分 Solver 操作，并基于求解结果提供可解释的分析。
+当前版本已经完成一个可运行的 MVP：
 
-## 项目初衷
+- Qt/C++ Solver GUI 与本地 WebSocket JSON-RPC API；
+- GTO 状态读取、牌局写入、异步求解、结果查询和 artifact；
+- DSH Cordis 插件：5 个 GTO tools、后台 job、审批和预算控制；
+- Qt ACP Chat：真实 DSH ACP v1 stdio 接入、Markdown 渲染、工具状态和审批；
+- 真实 DeepSeek 模型端到端验收；
+- 一键演示启动脚本。
 
-- 保留开源 GTO Solver 的原始界面和主要操作方式；
-- 在界面中加入 Chat，让用户可以用自然语言完成配置、求解和结果解读；
-- 使用 DSH（DeepSeek Harness）作为 Agent Runtime；
-- 通过语义化 UI/API Bridge 操作 Solver，而不是依赖截图和坐标点击；
-- 支持可替换的垂直领域资源包，例如现金局、锦标赛、不同牌类和训练资料；
-- 保持 Solver、DSH 和领域资源之间的边界清晰，避免业务逻辑互相污染。
+> 仓库中的 `engines/dsh` 始终保持上游源码不变。GTO 接入位于树外插件
+> `plugins/dsh-gto-solver`，不是对 DSH 核心的 fork。
 
-## 项目状态
+## 1. 直接演示 MVP
 
-项目目前处于设计和原型阶段，尚未达到可日常使用的程度。
+### 前置条件
 
-当前重点是先把 GTO Solver 的能力以稳定、可测试的方式暴露出来，再逐步接入 Chat 和 Agent 工作流。
+- Windows；
+- Qt 5.15.2；当前构建使用 MSVC 2017；
+- Node.js；
+- `engines/dsh` 依赖已安装；
+- 一个可用的 DeepSeek API Key。
 
-## 直接演示 MVP
+当前演示脚本默认使用：
 
-1. 复制 `.env.example` 为 `.env`，填入本地 `DEEPSEEK_API_KEY`。`.env` 已被 `.gitignore` 忽略。
-2. 构建演示程序：
+```text
+qmake: D:\conda\Library\bin\qmake.exe
+DSH:   engines/dsh/apps/cli/src/bin.ts
+Node:  从 PATH 查找，或设置 RANGEPILOT_NODE
+```
+
+### 配置 Key
+
+复制示例文件，填入本地 Key：
+
+```powershell
+copy .env.example .env
+```
+
+`.env` 已被 `.gitignore` 忽略，不会进入 Git。也可以直接在启动进程前设置
+`DEEPSEEK_API_KEY` 环境变量。
+
+### 构建并启动
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build-mvp-demo.ps1
-```
-
-3. 启动演示：
-
-```powershell
 scripts\run-mvp-demo.cmd
 ```
 
 启动器会：
 
-- 拉起带本地 API 的 TexasSolver GUI；
-- 创建 `.demo/dsh-home` 临时 DSH 环境；
-- 把 `plugins/dsh-gto-solver` 安装到 `acp` profile；
-- 启动 DSH ACP，并由右侧独立 `AI Chat` 窗口连接。
+1. 拉起带 Local API 的 `TexasSolverGui`；
+2. 创建被忽略的 `.demo/dsh-home` DSH 环境；
+3. 将 `plugins/dsh-gto-solver` 安装到 `acp` profile；
+4. 启动真实 DSH ACP 子进程；
+5. 打开独立浮动的 `AI Chat` 窗口。
 
-可以直接尝试：
-
-- `读取当前 GTO 状态，告诉我 revision、positions 和 board。`
-- `读取状态后，用过期 revision 调用 gto_set_spot，验证 STATE_CONFLICT。`
-- `启动一个 maxIterations=3、targetExploitability=10 的求解，审批时等我确认。`
-- `求解完成后查询 root 节点的策略摘要。`
-
-演示环境、构建产物和密钥文件都不会进入 Git。
-
-## 本地 API 与 AI Chat（阶段 6）
-
-GTO 本地 API 默认关闭，使用 WebSocket + JSON-RPC 2.0：
-
-```bash
-TexasSolverGui --api-enabled --api-port 0
-```
-
-启动后服务只在 `127.0.0.1` 监听，并将会话发现信息写入
-`%LOCALAPPDATA%\RangePilot\gto-gui\api.json`。客户端读取端口和 token 后连接
-`ws://127.0.0.1:<port>/rpc`，先调用 `system.hello`，再调用 `state.get`。
-可用 capability 为 `state.read`、`spot.write`、`solve.control`、`result.read`、`artifact.read` 和 `ui.focus`。阶段 5 支持牌局校验/写入、异步求解控制、节点策略/EV/exploitability/artifact 查询，以及 GUI 结果面板打开、节点聚焦和 `event.selection_changed`。写操作必须携带 `expectedRevision`，版本冲突返回 `STATE_CONFLICT`；完整策略矩阵通过 artifact 引用返回，不进入 JSON-RPC 响应正文。
-
-接口契约位于 `apps/gto-gui/api/schema/`，测试位于 `apps/gto-gui/tests/api/`。
-
-阶段 6 增加了最小 Qt AI Chat 面板与 ACP v1 stdio 客户端。GUI 通过 `QProcess` 启动 `dsh --profile acp`，处理 `initialize`、`session/new`、`session/prompt`、`session/update`、`session/request_permission`、`session/cancel` 和 `session/close`。求解审批会显示为模态允许/拒绝对话框。
-
-开发环境可通过以下变量指定 DSH 启动方式：
+启动成功后 Chat 顶部应显示：
 
 ```text
-RANGEPILOT_DSH_COMMAND        # 例如 dsh，或 node
-RANGEPILOT_DSH_ARGS           # 例如 "--profile acp"，或 "--import tsx/esm apps/cli/src/bin.ts --profile acp"
-RANGEPILOT_DSH_CWD            # DSH 工作目录
+Connected; session ...
+No active tool call
 ```
 
-`plugins/dsh-gto-solver` 需要通过 DSH profile 安装后才能被 `acp` profile 加载。
+### 建议演示流程
 
-## 架构愿景
+```text
+读取当前 GTO 状态，告诉我 revision、positions 和 board。
+```
+
+```text
+OOP 范围 AA KK，IP 范围 AA AKs AKo QQ，其他设置默认，迭代 10 次后求解；
+出现审批时等我确认。
+```
+
+```text
+查询 root 节点的策略摘要，用 Markdown 表格展示动作、频率和 EV。
+```
+
+## 2. 已实现能力
+
+### GTO 本地 API
+
+- WebSocket + JSON-RPC 2.0，仅绑定 `127.0.0.1`；
+- 每次启动生成随机 token，写入 discovery 文件；
+- `system.hello` 握手；
+- `state.get`、`spot.validate`、`range.validate`、`spot.set`；
+- `solve.start`、`solve.getStatus`、`solve.cancel`、`solve.getSummary`；
+- `result.getNodeStrategy`、`result.getActionEv`、`result.getExploitability`；
+- `artifact.getMetadata`；
+- `ui.focusNode`、`ui.openResult`；
+- `state_changed`、`selection_changed` 和求解生命周期事件。
+
+完整契约见 [`apps/gto-gui/api/schema/`](apps/gto-gui/api/schema/)，
+说明见 [GTO Local API](docs/gto-local-api.md)。
+
+### DSH 插件
+
+`plugins/dsh-gto-solver` 是独立的 Cordis 插件，注入 `tools` 和 `jobs`：
+
+- `gto_get_state`
+- `gto_set_spot`
+- `gto_start_solve`
+- `gto_get_solve_status`
+- `gto_query_strategy`
+
+求解启动前通过 `tools/pre-execute` 做 revision、预算和单任务检查，并返回
+`ask` 审批。DSH job 与 GTO job 建立映射，支持进度、超时和取消。
+
+详见 [DSH GTO 插件](docs/dsh-plugin.md)。
+
+### Qt Chat
+
+- ACP v1 over stdio；
+- `initialize`、`session/new`、`session/prompt`、`session/update`；
+- `session/request_permission`、`session/cancel`、`session/close`；
+- 流式消息、Markdown 渲染、自动滚动；
+- 工具名称与状态展示；
+- 允许/拒绝审批弹窗；
+- 独立浮动窗口，避免被主界面挤压。
+
+## 3. 架构
 
 ```mermaid
 flowchart LR
-    U["用户"] --> GUI["原始 GTO Solver GUI"]
-    U --> CHAT["Chat 面板"]
+    U["用户"] --> GUI["TexasSolver Qt GUI"]
+    U --> CHAT["AI Chat / DSH UI"]
     CHAT --> DSH["DSH Agent Runtime"]
-    DSH --> PLUGIN["GTO Copilot Plugin"]
-    PLUGIN --> API["Local Solver API"]
-    API --> GUI
-    GUI --> CORE["GTO Solver Core"]
-    PLUGIN --> PACKS["可替换领域资源包"]
+    DSH --> PLUGIN["@rangepilot/dsh-gto-solver"]
+    PLUGIN --> API["Local WebSocket JSON-RPC"]
+    API --> SERVICE["GtoApplicationService"]
+    SERVICE --> SOLVER["Qt Solver / QSolverJob"]
+    SERVICE --> ARTIFACT["Artifact Store"]
+    PLUGIN --> APPROVAL["DSH approval / jobs"]
 ```
 
-核心原则：
+关键边界：
 
-- Solver GUI 是宿主；
-- DSH 是 Agent 引擎；
-- Copilot 插件负责桥接；
-- 领域资源包负责提供可替换的知识、技能、工具和评估集；
-- Solver API 不依赖 DSH，未来可以更换 Agent 引擎。
+- **GUI 是唯一状态源**；API 不直接操作控件，而是通过
+  `GtoApplicationService` 读写状态；
+- **API 不知道 DSH、Agent、LLM 或 Chat**；
+- **插件不知道 Qt 控件细节**，只使用稳定的 Local API；
+- **DSH 源码不需要修改**；
+- 写操作使用 `expectedRevision` 做乐观并发控制；
+- 完整策略矩阵进入 artifact，Agent 只拿动作级摘要。
 
-## 仓库结构
+更完整的组件和时序说明见 [架构文档](docs/architecture.md)。
+
+## 4. 仓库结构
 
 | 路径 | 说明 |
 |---|---|
-| `apps/gto-gui` | 开源 GTO Solver GUI 的 Git submodule |`n| `apps/gto-gui/api/schema` | 本地 GTO API 的 JSON Schema 契约 |`n| `apps/gto-gui/src/api` | WebSocket Server、JSON-RPC、应用服务和事件 DTO |`n| `apps/gto-gui/tests/api` | API 契约测试与 WebSocket smoke test |
-| `engines/dsh` | DSH Agent Engine 的 Git submodule |
-| `plugins/dsh-gto-solver` | 树外 DSH Cordis 插件：GTO 工具、后台求解和审批 |
-| `apps/gto-gui/src/chat` | Qt AI Chat 面板与 ACP stdio 客户端 |
-| `docs/gto-interface-exposure.md` | Solver 接口暴露技术方案 |
-| `docs/` | 架构、设计和集成文档 |
+| `apps/gto-gui/` | Qt/C++ Solver GUI submodule，包含 Local API 和 Qt Chat |
+| `apps/gto-gui/api/schema/` | JSON-RPC 契约的唯一事实来源 |
+| `apps/gto-gui/src/api/` | WebSocket Server、JSON-RPC、应用服务、DTO、artifact |
+| `apps/gto-gui/src/chat/` | ACP client 和 Qt Chat 面板 |
+| `apps/gto-gui/tests/api/` | API 契约测试与 WebSocket smoke test |
+| `engines/dsh/` | DSH Agent Runtime submodule，保持上游不变 |
+| `plugins/dsh-gto-solver/` | 树外 Cordis 插件：工具、job、审批 |
+| `scripts/` | 构建与一键演示脚本 |
+| `docs/` | 当前实现文档；历史设计文档在 `docs/history/` |
 
-## 拉取仓库
+## 5. 开发与测试
 
-```bash
-git clone --recurse-submodules https://github.com/maces622/RangePilot.git
-cd RangePilot
+### GUI 构建
+
+```powershell
+cd apps/gto-gui
+qmake TexasSolverGui.pro
+nmake
 ```
 
-如果已经 clone 但没有拉取 submodule：
+### API 契约测试
 
-```bash
-git submodule update --init --recursive
+```powershell
+cd apps/gto-gui
+python tests/api/test_contracts.py
 ```
 
-## 路线图
+### API WebSocket smoke test
 
-1. 暴露原始 Solver 的只读状态接口；
-2. 增加受 revision 保护的牌局配置接口；
-3. 增加异步求解控制、进度事件和结果查询；
-4. 接入 DSH Chat 和第一批 GTO 工具；
-5. 支持可替换的垂直领域资源包和评估体系。
+```powershell
+mkdir build-api-test
+cd build-api-test
+qmake ../tests/api/api_smoke_test.pro
+nmake
+release\api_smoke_test.exe
+```
 
-## 文档
+### Qt Chat smoke tests
 
-- [GTO Solver 接口暴露技术方案](docs/gto-interface-exposure.md)
+```powershell
+# ACP client 协议测试
+cd apps/gto-gui
+qmake tests/chat/chat_smoke_test.pro
+nmake
+
+# ChatPanel offscreen 测试
+qmake tests/chat/chat_panel_smoke_test.pro
+nmake
+```
+
+### DSH 插件测试
+
+```powershell
+cd plugins/dsh-gto-solver
+node --experimental-strip-types --test tests/*.test.ts
+```
+
+当前插件测试为 **10/10 通过**。测试矩阵和真实模型验收记录见
+[测试与验收](docs/testing.md)。
+
+## 6. 安全边界
+
+- API 只监听本机回环地址；
+- 客户端必须使用 discovery 文件中的随机 token 完成握手；
+- 写入和求解必须携带 revision；
+- 求解受最大迭代数、线程数、运行时间和目标 exploitability 限制；
+- 求解启动需要 DSH 审批；
+- `.env`、`.demo/`、`build/` 都不进入 Git；
+- 不在源码或文档中写入真实 API Key。
+
+## 7. 当前限制
+
+- Qt Chat 是 MVP 级客户端，不是完整 DSH UI 替代品；
+- 插件尚未声明 `dsh.bundle`，安装后仍需写入 profile 的
+  `cordis.patch.yml`；
+- `ui.focusNode` / `ui.openResult` 已在 API 层实现，但尚未封装成 DSH tool；
+- artifact 文件持久化在本地，进程内元数据索引尚未持久化；
+- DSH 源码模式启动仍会出现未构建 `lib/typert.host.js` 的非阻塞警告；
+- 尚未制作安装包和正式分发流程；
+- DSH Web UI 作为替代交互界面的方案仍在评估中。
+
+## 8. 文档
+
+- [文档索引](docs/README.md)
+- [当前架构](docs/architecture.md)
+- [GTO Local API](docs/gto-local-api.md)
+- [DSH GTO 插件](docs/dsh-plugin.md)
+- [MVP 演示指南](docs/mvp-demo.md)
+- [测试与验收](docs/testing.md)
+- [路线图与限制](docs/roadmap.md)
 - [仓库 Agent 上下文](AGENTS.md)
 
-## 说明
+## 9. 拉取仓库
 
-RangePilot 仍处于早期探索阶段，接口、目录和产品形态都可能继续调整。欢迎通过 Issue 讨论架构设计和使用场景。
+~~~powershell
+git clone --recurse-submodules https://github.com/maces622/RangePilot.git
+cd RangePilot
+~~~
+
+已经 clone 但未初始化 submodule：
+
+~~~powershell
+git submodule update --init --recursive
+~~~
+
+## 10. 项目状态
+
+RangePilot 已进入真实端到端验证完成阶段。
+真实模型、DSH、GUI Local API 和 GTO solve 的完整链路已经跑通。
+当前重点是改善交互体验、标准化插件安装、完善结果持久化。
+后续需要决定主入口使用 Qt 内嵌 Chat 还是 DSH 原生 Web UI。

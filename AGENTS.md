@@ -129,3 +129,31 @@ make
 
 修改协议时，顺序必须是：先更新 `api/schema/`，再更新 C++ DTO / dispatcher，
 最后更新客户端和测试。
+## 5. 当前实现状态与文档
+
+当前仓库已经完成可运行的阶段 6 MVP：
+
+- Qt Local API 已实现并通过契约与 WebSocket 测试；
+- 树外 DSH Cordis 插件已实现 5 个 GTO tools、审批和后台 job；
+- Qt ACP Chat 已接入真实 DSH；
+- 真实 DeepSeek 模型端到端链路已验证；
+- `engines/dsh` 保持上游提交，不修改 DSH 源码。
+
+当前文档：
+
+- [docs/README.md](docs/README.md)
+- [docs/architecture.md](docs/architecture.md)
+- [docs/gto-local-api.md](docs/gto-local-api.md)
+- [docs/dsh-plugin.md](docs/dsh-plugin.md)
+- [docs/mvp-demo.md](docs/mvp-demo.md)
+- [docs/testing.md](docs/testing.md)
+- [docs/roadmap.md](docs/roadmap.md)
+
+一键演示：
+
+~~~powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-mvp-demo.ps1
+scripts\run-mvp-demo.cmd
+~~~
+
+演示环境、构建产物和 `.env` 均被忽略，不进入 Git。
